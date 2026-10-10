@@ -30,3 +30,22 @@ Exemplo no PowerShell:
 $env:RADIO_SENHA = 'sua-nova-senha'
 python server.py
 Não há dependências externas.
+
+DEPLOY NA VERCEL
+O projeto inclui vercel.json, build estático e API Node.js para PostgreSQL.
+1. Envie a pasta que contém package.json e vercel.json ao repositório do deploy.
+2. Na Vercel, selecione essa pasta como Root Directory e Framework Preset Other.
+3. Build Command: npm run build. Output Directory: public.
+4. Conecte um banco PostgreSQL e configure as variáveis do projeto:
+   DATABASE_URL: URL de conexão do banco (ou POSTGRES_URL).
+   RADIO_SENHA: senha de acesso à gestão (radio123 para manter a atual).
+   RADIO_TOKEN_SECRET: segredo aleatório longo, mantido somente no servidor.
+   Gere um segredo localmente com:
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+5. Faça um NOVO deploy com esses arquivos e variáveis.
+6. Acesse /radio/ e /gestao/. A raiz / também abre a rádio.
+A API cria sua tabela automaticamente; o usuário do banco deve ter permissão
+para CREATE TABLE. Use a conexão com pooling fornecida pelo banco, se disponível.
+Não envie credenciais por chat e não inclua arquivos .env no repositório.
+O SQLite local não é usado na Vercel e não é migrado automaticamente.
+O teste local com python server.py continua disponível, com banco separado.

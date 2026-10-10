@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": { "includeFiles": "musicas/catalogo.js" }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/radio/index.html" },
+    { "source": "/radio", "destination": "/radio/index.html" },
+    { "source": "/radio/", "destination": "/radio/index.html" },
+    { "source": "/gestao", "destination": "/gestao/index.html" },
+    { "source": "/gestao/", "destination": "/gestao/index.html" },
+    { "source": "/api/:path*", "destination": "/api/index?route=:path*" }
+  ]
+}

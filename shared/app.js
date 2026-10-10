@@ -37,8 +37,8 @@ async function atualizar() {
     clockOffset = estado.servidorAgora - (start + Date.now()) / 2;
     el('conexao').textContent = '';
     render();
-  } catch {
-    el('conexao').textContent = 'Sem conexão com a rádio. Tentando reconectar… Inicie o servidor com python server.py.';
+  } catch (error) {
+    el('conexao').textContent = error.message;
   }
 }
 

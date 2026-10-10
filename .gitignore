@@ -1,2 +1,6 @@
 radio.sqlite3*
 __pycache__/
+node_modules/
+public/
+.vercel/
+.env*

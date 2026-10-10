@@ -1,0 +1,12 @@
+{
+  "name": "radio-conect",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "check": "node --check api/index.js && node --check shared/app.js"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
