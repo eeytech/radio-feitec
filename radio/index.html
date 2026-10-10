@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0a10" />
+    <title>Rádio Conect — Rádio</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .nav {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 22px;
+      }
+      .nav a {
+        padding: 10px 15px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .nav a.active {
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+      }
+      .public-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .now {
+        padding: 18px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.04);
+        min-height: 70px;
+      }
+      .status {
+        min-height: 24px;
+        margin-top: 10px;
+      }
+      .muted {
+        color: #a9a3b5;
+      }
+      .radio-player {
+        display: block;
+        width: 100%;
+        margin-top: 16px;
+      }
+      @media (max-width: 700px) {
+        .public-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🎵 Rádio Conect</h1>
+      <p>Peça sua música e acompanhe a programação.</p>
+      <nav class="nav">
+        <a class="active" href="./index.html">📻 Rádio</a
+        ><a href="../gestao/index.html">⚙️ Gestão</a>
+      </nav>
+    </header>
+    <main class="container">
+      <section class="public-grid">
+        <div class="card">
+          <h2>🎶 Solicitar uma música</h2>
+          <label for="musica">Música cadastrada</label><select id="musica"></select><label for="nome">Seu nome</label><input
+            maxlength="100" id="nome"
+            placeholder="Seu nome"
+          /><button onclick="pedirMusica()">🎵 Pedir música</button>
+          <p id="mensagem" role="status" class="status"></p>
+        </div>
+        <div class="card">
+          <h2>🎧 Tocando agora</h2>
+          <div id="agora" class="now">
+            <span class="muted">Nenhuma música tocando no momento.</span>
+          </div>
+          <audio id="radioAudio" preload="auto"></audio>
+          <button id="ativarSom" onclick="ativarSom()">🔊 Ativar som</button>
+          <label for="volume">Volume</label><input id="volume" type="range" min="0" max="1" step="0.05" value="1" />
+          <p id="audioStatus" role="status" class="status"></p>
+        </div>
+      </section>
+      <section class="card">
+        <h2>💡 Sugerir uma música para o catálogo</h2>
+        <p class="muted">Não encontrou sua música? Envie uma sugestão para a equipe.</p>
+        <label for="sugestaoMusica">Música e artista</label><input id="sugestaoMusica" maxlength="200" placeholder="Nome da música e artista" />
+        <label for="sugestaoNome">Seu nome</label><input id="sugestaoNome" maxlength="100" placeholder="Seu nome" />
+        <button onclick="sugerirMusica()">Enviar sugestão</button>
+        <p id="sugestaoMensagem" class="status" role="status"></p>
+      </section>
+      <section class="card">
+        <h2>📋 Solicitações</h2>
+        <ul id="fila"></ul>
+      </section>
+    </main>
+    <p id="conexao" role="status" class="container"></p>
+    <footer>Rádio Conect © 2026</footer>
+    <script src="../musicas/catalogo.js"></script>
+    <script src="../shared/app.js"></script>
+  </body>
+</html>

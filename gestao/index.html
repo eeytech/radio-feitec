@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0a10" />
+    <title>Rádio Conect — Gestão</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .nav {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 22px;
+      }
+      .nav a {
+        padding: 10px 15px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .nav a.active {
+        background: linear-gradient(135deg, #a855f7, #7c3aed);
+      }
+      .gestao-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        padding: 16px;
+        margin: 10px 0;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+      .acoes {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btn-danger {
+        background: rgba(251, 113, 133, 0.15);
+        color: #fda4af;
+        box-shadow: none;
+      }
+      .player-site {
+        margin-top: 18px;
+        padding: 15px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .small {
+        color: #a9a3b5;
+        font-size: 0.85rem;
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+      }
+      .modal.aberto { display: flex; }
+      .modal-box {
+        width: min(100%, 520px);
+        padding: 24px;
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 18px;
+        background: #15121d;
+        box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      }
+      .modal-box input, .modal-box select { margin: 12px 0; }
+      .modal-acoes { display: flex; gap: 10px; justify-content: flex-end; }
+      .btn-secondary {
+        background: rgba(255,255,255,.08);
+        color: #fff;
+        box-shadow: none;
+      }
+      @media (max-width: 700px) {
+        .gestao-item {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .acoes {
+          width: 100%;
+        }
+        .acoes button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>⚙️ Gestão da Rádio</h1>
+      <p>Gerencie as solicitações e a programação.</p>
+      <nav class="nav">
+        <a href="../radio/index.html">📻 Rádio</a
+        ><a class="active" href="./index.html">⚙️ Gestão</a>
+      </nav>
+    </header>
+    <main class="container">
+      <section id="login" class="card">
+        <h2>🔐 Acesso da gestão</h2>
+        <input id="senha" type="password" placeholder="Digite a senha" /><button
+          onclick="entrar()"
+        >
+          Entrar
+        </button>
+        <p id="erro" class="status"></p>
+        <p class="small"></p>
+      </section>
+      <section id="painel" class="card oculta">
+        <h2>📋 Lista de solicitações</h2>
+        <div class="acoes">
+          <button onclick="atualizar()">🔄 Atualizar</button
+          ><button class="btn-danger" onclick="limparTudo()">
+            🗑 Limpar lista
+          </button>
+        </div>
+        <div id="lista" style="margin-top: 18px"></div>
+        <button onclick="acao('parar')">⏹ Parar transmissão</button>
+        <h2 style="margin-top:24px">💡 Sugestões para o catálogo</h2>
+        <div id="sugestoes"></div>
+      </section>
+    </main>
+
+    <p id="conexao" role="status" class="container"></p>
+    <footer>Rádio Conect © 2026</footer>
+    <script src="../musicas/catalogo.js"></script>
+    <script src="../shared/app.js"></script>
+  </body>
+</html>
