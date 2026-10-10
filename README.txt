@@ -14,7 +14,11 @@ em /musicas/catalogo.js, mantendo o formato existente. Recarregue a página.
 
 TRANSMISSÃO: Tocar inicia diretamente a música do pedido para todos.
 O horário central de início sincroniza quem já está ouvindo e quem entra depois.
-Atualização a cada segundo; desvios maiores que 0,8 segundo são corrigidos.
+Atualização a cada segundo; o relógio usa as amostras de menor latência.
+Desvios entre 0,15 e 1,5 segundo são corrigidos gradualmente pela velocidade.
+Desvios maiores usam busca, com intervalo mínimo de 5 segundos entre saltos.
+O áudio espera carregar antes do primeiro alinhamento; respostas antigas
+são descartadas. Alternância de instâncias temporárias gera um aviso.
 A sincronização é aproximada e depende da rede e do navegador.
 Parar, remover o pedido tocando ou limpar a fila interrompe a transmissão.
 Ao terminar uma faixa, a rádio aguarda o próximo Tocar.

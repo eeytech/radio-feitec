@@ -8,6 +8,7 @@ let pool;
 const initial = () => ({ pedidos: [], sugestoes: [], transmissao: null });
 // Modo de demonstração escolar: funciona sem serviços ou variáveis externas.
 let demoState = initial();
+const demoInstance = crypto.randomUUID();
 const password = process.env.RADIO_SENHA || 'radio123';
 const tokenSecret = process.env.RADIO_TOKEN_SECRET || 'radio-conect-demonstracao-escolar-v1';
 const catalog = vm.runInNewContext(
@@ -75,7 +76,7 @@ module.exports = async function handler(req, res) {
         if (route !== 'estado') fail('Rota não encontrada.', 404);
         const state = structuredClone(demoState);
         if (!auth) delete state.sugestoes;
-        return res.status(200).json({ ...state, servidorAgora: Date.now(), modo: 'demonstracao' });
+        return res.status(200).json({ ...state, servidorAgora: Date.now(), modo: 'demonstracao', instancia: demoInstance });
       }
       mutate(demoState, route, data);
       return res.status(200).json({ ok: true });

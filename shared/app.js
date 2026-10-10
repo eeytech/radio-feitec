@@ -2,9 +2,17 @@ const gestao = !!document.getElementById('painel');
 let token = '';
 try { token = sessionStorage.getItem('radioToken') || ''; } catch {}
 let estado = { pedidos: [], sugestoes: [], transmissao: null };
-let clockOffset = 0;
 let sessaoAudio = null;
 let bloqueado = false;
+let relogio = null;
+let amostrasRelogio = [];
+let ultimaResposta = 0;
+let numeroConsulta = 0;
+let alinhamentoInicial = false;
+let ultimoSalto = -Infinity;
+let playPendente = null;
+let instanciaAnterior = null;
+let instanciasDiferentes = false;
 const el = id => document.getElementById(id);
 const audio = el('radioAudio');
 
@@ -31,11 +39,25 @@ async function api(path, data) {
 }
 
 async function atualizar() {
-  const start = Date.now();
+  const consulta = ++numeroConsulta;
+  const start = performance.now();
   try {
-    estado = await api('estado');
-    clockOffset = estado.servidorAgora - (start + Date.now()) / 2;
-    el('conexao').textContent = '';
+    const recebido = await api('estado');
+    const fim = performance.now();
+    if (consulta < ultimaResposta) return;
+    ultimaResposta = consulta;
+    // Usa as amostras de menor latência para reduzir oscilações de rede.
+    amostrasRelogio.push({ rtt: fim - start, offset: recebido.servidorAgora - (start + fim) / 2 });
+    amostrasRelogio = amostrasRelogio.slice(-12);
+    const melhor = amostrasRelogio.reduce((a, b) => a.rtt < b.rtt ? a : b);
+    relogio = melhor.offset;
+    estado = recebido;
+    if (recebido.instancia) {
+      if (instanciaAnterior && instanciaAnterior !== recebido.instancia) instanciasDiferentes = true;
+      instanciaAnterior = recebido.instancia;
+    }
+    el('conexao').textContent = instanciasDiferentes
+      ? 'A hospedagem está alternando servidores temporários. O modo sem banco não consegue manter todos os ouvintes sincronizados.' : '';
     render();
   } catch (error) {
     el('conexao').textContent = error.message;
@@ -122,12 +144,15 @@ function render() {
   }
 }
 
-function posicao() { return Math.max(0, (Date.now() + clockOffset - estado.transmissao.inicio) / 1000); }
+function posicao() { return Math.max(0, (performance.now() + relogio - estado.transmissao.inicio) / 1000); }
 
 function sincronizar() {
   const t = estado.transmissao;
   if (!t) {
-    audio.pause(); audio.removeAttribute('src'); audio.load();
+    if (sessaoAudio !== null) {
+      audio.pause(); audio.removeAttribute('src'); audio.load();
+    }
+    audio.playbackRate = 1;
     sessaoAudio = null; bloqueado = false;
     el('audioStatus').textContent = 'Aguardando a programação.';
     el('ativarSom').hidden = true;
@@ -135,23 +160,41 @@ function sincronizar() {
   }
   if (sessaoAudio !== t.sessao) {
     sessaoAudio = t.sessao; bloqueado = false;
+    alinhamentoInicial = true;
+    ultimoSalto = -Infinity;
+    audio.playbackRate = 1;
     audio.src = '/musicas/' + encodeURIComponent(t.arquivo);
     audio.load();
   }
-  if (audio.readyState < 1) return;
+  if (audio.readyState < 2 || audio.seeking || relogio === null) return;
   const target = posicao();
   if (Number.isFinite(audio.duration) && target >= audio.duration) {
     audio.pause();
+    audio.playbackRate = 1;
     el('audioStatus').textContent = 'Música encerrada. Aguardando a próxima transmissão.';
     el('ativarSom').hidden = true;
     return;
   }
-  if (Math.abs(audio.currentTime - target) > 0.8) audio.currentTime = target;
+  const desvio = target - audio.currentTime;
+  const agora = performance.now();
+  if (alinhamentoInicial || (Math.abs(desvio) > 1.5 && agora - ultimoSalto > 5000)) {
+    audio.currentTime = target;
+    alinhamentoInicial = false;
+    ultimoSalto = agora;
+    audio.playbackRate = 1;
+  } else if (!audio.paused && Math.abs(desvio) > 0.15 && Math.abs(desvio) <= 1.5) {
+    // Pequenas diferenças são corrigidas gradualmente, sem saltos na música.
+    audio.playbackRate = desvio > 0 ? 1.03 : 0.97;
+  } else {
+    audio.playbackRate = 1;
+  }
   if (audio.paused && !bloqueado) tentarPlay();
 }
 
 async function tentarPlay() {
   const session = sessaoAudio;
+  if (playPendente === session) return;
+  playPendente = session;
   try {
     await audio.play();
     if (session !== sessaoAudio) return;
@@ -163,7 +206,7 @@ async function tentarPlay() {
     el('audioStatus').textContent = error.name === 'NotAllowedError'
       ? 'Seu navegador pede uma interação: toque em Ativar som para ouvir a rádio.'
       : 'Não foi possível reproduzir o áudio. Toque em Ativar som para tentar novamente.';
-  }
+  } finally { if (playPendente === session) playPendente = null; }
 }
 function ativarSom() {
   if (!estado.transmissao) return;
@@ -176,6 +219,9 @@ if (audio) {
   el('musica').append(new Option('Selecione uma música', ''));
   MUSICAS.forEach(m => el('musica').append(new Option(m.nome, m.arquivo)));
   audio.addEventListener('loadedmetadata', sincronizar);
+  audio.addEventListener('canplay', sincronizar);
+  audio.addEventListener('seeked', sincronizar);
+  if ('preservesPitch' in audio) audio.preservesPitch = true;
   audio.addEventListener('error', () => { el('audioStatus').textContent = 'Arquivo de áudio indisponível. Avise a gestão.'; });
   el('volume').oninput = () => { audio.volume = Number(el('volume').value); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizar(); });
