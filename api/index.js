@@ -6,11 +6,15 @@ const vm = require('node:vm');
 
 let pool;
 const initial = () => ({ pedidos: [], sugestoes: [], transmissao: null });
+// Modo de demonstração escolar: funciona sem serviços ou variáveis externas.
+let demoState = initial();
+const password = process.env.RADIO_SENHA || 'radio123';
+const tokenSecret = process.env.RADIO_TOKEN_SECRET || 'radio-conect-demonstracao-escolar-v1';
 const catalog = vm.runInNewContext(
   fs.readFileSync(path.join(__dirname, '../musicas/catalogo.js'), 'utf8') + '\nMUSICAS;'
 );
 function signature(value) {
-  return crypto.createHmac('sha256', process.env.RADIO_TOKEN_SECRET).update(value).digest('hex');
+  return crypto.createHmac('sha256', tokenSecret).update(value).digest('hex');
 }
 function authenticated(req) {
   const token = req.headers.authorization || '';
@@ -55,13 +59,10 @@ module.exports = async function handler(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const route = req.query?.route || url.searchParams.get('route') || url.pathname.replace(/^\/api\//, '').replace(/\/$/, '');
     if (!['GET', 'POST'].includes(req.method)) fail('Método não permitido.', 405);
-    if (!process.env.RADIO_SENHA || !process.env.RADIO_TOKEN_SECRET) {
-      fail('Configure RADIO_SENHA e RADIO_TOKEN_SECRET nas variáveis de ambiente da Vercel e faça um novo deploy.', 503);
-    }
     const auth = authenticated(req);
     const data = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     if (req.method === 'POST' && route === 'login') {
-      if (data.senha !== process.env.RADIO_SENHA) fail('Senha incorreta.', 401);
+      if (data.senha !== password) fail('Senha incorreta.', 401);
       const value = `${Date.now() + 86400000}.${crypto.randomBytes(24).toString('hex')}`;
       return res.status(200).json({ token: `${value}.${signature(value)}` });
     }
@@ -69,7 +70,16 @@ module.exports = async function handler(req, res) {
       fail('Entre na gestão novamente.', 401);
     }
     const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-    if (!connectionString) fail('Configure DATABASE_URL com a conexão PostgreSQL na Vercel e faça um novo deploy.', 503);
+    if (!connectionString) {
+      if (req.method === 'GET') {
+        if (route !== 'estado') fail('Rota não encontrada.', 404);
+        const state = structuredClone(demoState);
+        if (!auth) delete state.sugestoes;
+        return res.status(200).json({ ...state, servidorAgora: Date.now(), modo: 'demonstracao' });
+      }
+      mutate(demoState, route, data);
+      return res.status(200).json({ ok: true });
+    }
     pool ||= new Pool({ connectionString, max: 3, connectionTimeoutMillis: 10000 });
     const client = await pool.connect();
     try {

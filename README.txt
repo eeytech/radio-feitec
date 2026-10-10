@@ -36,12 +36,14 @@ O projeto inclui vercel.json, build estático e API Node.js para PostgreSQL.
 1. Envie a pasta que contém package.json e vercel.json ao repositório do deploy.
 2. Na Vercel, selecione essa pasta como Root Directory e Framework Preset Other.
 3. Build Command: npm run build. Output Directory: public.
-4. Conecte um banco PostgreSQL e configure as variáveis do projeto:
-   DATABASE_URL: URL de conexão do banco (ou POSTGRES_URL).
-   RADIO_SENHA: senha de acesso à gestão (radio123 para manter a atual).
-   RADIO_TOKEN_SECRET: segredo aleatório longo, mantido somente no servidor.
-   Gere um segredo localmente com:
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+4. Nenhuma variável é obrigatória: a senha padrão é radio123.
+   Sem banco, funciona em modo de demonstração com dados temporários na
+   memória da função. A Vercel pode reiniciar ou criar outras instâncias:
+   pedidos podem desaparecer e ouvintes em instâncias diferentes podem
+   receber estados diferentes. Esse modo não garante sincronização entre
+   todos os dispositivos. Para persistência e estado compartilhado confiável,
+   configure opcionalmente DATABASE_URL (ou POSTGRES_URL) com PostgreSQL.
+   RADIO_SENHA e RADIO_TOKEN_SECRET também são opcionais.
 5. Faça um NOVO deploy com esses arquivos e variáveis.
 6. Acesse /radio/ e /gestao/. A raiz / também abre a rádio.
 A API cria sua tabela automaticamente; o usuário do banco deve ter permissão
