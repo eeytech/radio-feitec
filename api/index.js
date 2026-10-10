@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 let pool;
-const initial = () => ({ pedidos: [], sugestoes: [], transmissao: null });
+const initial = () => ({ pedidos: [], sugestoes: [], transmissao: null, revisao: 0 });
 // Modo de demonstração escolar: funciona sem serviços ou variáveis externas.
 let demoState = initial();
 const demoInstance = crypto.randomUUID();
@@ -41,6 +41,7 @@ function mutate(state, route, data) {
   } else if (route === 'tocar') {
     const item = state.pedidos.find(x => x.id === data.id);
     if (!item) fail('Pedido não encontrado.', 404);
+    if (state.transmissao?.id === item.id) return;
     state.pedidos.forEach(x => { x.status = x.id === item.id ? 'tocando' : 'pendente'; });
     state.transmissao = { ...item, inicio: Date.now(), sessao: crypto.randomUUID() };
   } else if (route === 'parar') {
@@ -52,6 +53,7 @@ function mutate(state, route, data) {
   } else if (route === 'remover-sugestao') {
     state.sugestoes = state.sugestoes.filter(x => x.id !== data.id);
   } else fail('Rota não encontrada.', 404);
+  state.revisao = (state.revisao || 0) + 1;
 }
 
 module.exports = async function handler(req, res) {
@@ -72,6 +74,9 @@ module.exports = async function handler(req, res) {
     }
     const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
     if (!connectionString) {
+      if (req.method === 'POST' && req.headers['x-radio-instance'] && req.headers['x-radio-instance'] !== demoInstance) {
+        fail('O servidor temporário mudou. Recarregue a página para reconectar antes de enviar pedidos ou controlar a rádio.', 409);
+      }
       if (req.method === 'GET') {
         if (route !== 'estado') fail('Rota não encontrada.', 404);
         const state = structuredClone(demoState);

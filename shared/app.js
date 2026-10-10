@@ -2,19 +2,19 @@ const gestao = !!document.getElementById('painel');
 let token = '';
 try { token = sessionStorage.getItem('radioToken') || ''; } catch {}
 let estado = { pedidos: [], sugestoes: [], transmissao: null };
-let sessaoAudio = null;
-let bloqueado = false;
 let relogio = null;
 let amostrasRelogio = [];
 let ultimaResposta = 0;
 let numeroConsulta = 0;
-let alinhamentoInicial = false;
-let ultimoSalto = -Infinity;
-let playPendente = null;
 let instanciaAnterior = null;
-let instanciasDiferentes = false;
+let revisaoRecebida = -1;
+let desenhoAnterior = '';
+let acaoPendente = false;
+let pedidoPendente = false;
 const el = id => document.getElementById(id);
 const audio = el('radioAudio');
+const player = audio ? new RadioPlayer(audio, el('audioStatus'), el('ativarSom'),
+  () => relogio === null ? Date.now() : performance.now() + relogio) : null;
 
 async function api(path, data) {
   if (location.protocol === 'file:') {
@@ -24,7 +24,8 @@ async function api(path, data) {
   try {
     response = await fetch('/api/' + path, {
     method: data === undefined ? 'GET' : 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: token },
+    headers: { 'Content-Type': 'application/json', Authorization: token,
+      ...(instanciaAnterior ? { 'X-Radio-Instance': instanciaAnterior } : {}) },
     body: data === undefined ? undefined : JSON.stringify(data), cache: 'no-store'
     });
   } catch {
@@ -46,18 +47,21 @@ async function atualizar() {
     const fim = performance.now();
     if (consulta < ultimaResposta) return;
     ultimaResposta = consulta;
+    // Não alterna o player entre cópias independentes da memória da Vercel.
+    if (recebido.instancia && instanciaAnterior && recebido.instancia !== instanciaAnterior) {
+      el('conexao').textContent = 'O servidor temporário mudou. A reprodução foi preservada. Recarregue a página para reconectar à programação; para sincronização entre todos, use o servidor Python local.';
+      return;
+    }
+    if (recebido.instancia) instanciaAnterior = recebido.instancia;
+    if (Number.isFinite(recebido.revisao) && recebido.revisao < revisaoRecebida) return;
+    if (Number.isFinite(recebido.revisao)) revisaoRecebida = recebido.revisao;
     // Usa as amostras de menor latência para reduzir oscilações de rede.
     amostrasRelogio.push({ rtt: fim - start, offset: recebido.servidorAgora - (start + fim) / 2 });
     amostrasRelogio = amostrasRelogio.slice(-12);
     const melhor = amostrasRelogio.reduce((a, b) => a.rtt < b.rtt ? a : b);
     relogio = melhor.offset;
     estado = recebido;
-    if (recebido.instancia) {
-      if (instanciaAnterior && instanciaAnterior !== recebido.instancia) instanciasDiferentes = true;
-      instanciaAnterior = recebido.instancia;
-    }
-    el('conexao').textContent = instanciasDiferentes
-      ? 'A hospedagem está alternando servidores temporários. O modo sem banco não consegue manter todos os ouvintes sincronizados.' : '';
+    el('conexao').textContent = '';
     render();
   } catch (error) {
     el('conexao').textContent = error.message;
@@ -77,18 +81,21 @@ async function entrar() {
 }
 
 async function pedirMusica() {
+  if (pedidoPendente) return;
   const musica = MUSICAS.find(m => m.arquivo === el('musica').value);
   if (!musica || !el('nome').value.trim()) {
     el('mensagem').textContent = 'Selecione uma música e informe seu nome.';
     return;
   }
   try {
+    pedidoPendente = true;
     await api('pedir', { musica: musica.nome, arquivo: musica.arquivo, nome: el('nome').value.trim() });
     el('musica').value = '';
     el('nome').value = '';
     el('mensagem').textContent = '✅ Pedido enviado para a rádio!';
     await atualizar();
   } catch (error) { el('mensagem').textContent = error.message; }
+  finally { pedidoPendente = false; }
 }
 
 async function sugerirMusica() {
@@ -101,8 +108,11 @@ async function sugerirMusica() {
 }
 
 async function acao(path, id) {
+  if (acaoPendente) return;
+  acaoPendente = true;
   try { await api(path, { id }); await atualizar(); }
   catch (error) { el('conexao').textContent = error.message; }
+  finally { acaoPendente = false; }
 }
 function limparTudo() { if (confirm('Tem certeza que deseja limpar a lista?')) acao('limpar'); }
 
@@ -112,6 +122,15 @@ function button(text, action) {
 }
 
 function render() {
+  // Uma atualização de fila não participa do ciclo de reprodução.
+  if (player) {
+    const t = estado.transmissao;
+    el('agora').textContent = t ? `🎵 ${t.musica} — pedido por ${t.nome}` : 'Nenhuma música tocando no momento.';
+    player.setTransmission(t);
+  }
+  const desenho = JSON.stringify([estado.pedidos, estado.sugestoes]);
+  if (desenho === desenhoAnterior) return;
+  desenhoAnterior = desenho;
   const box = el(gestao ? 'lista' : 'fila');
   box.replaceChildren();
   if (!estado.pedidos.length) box.textContent = 'Nenhuma solicitação na fila.';
@@ -123,7 +142,9 @@ function render() {
     row.append(text);
     if (gestao) {
       const actions = document.createElement('div'); actions.className = 'acoes';
-      actions.append(button('▶️ Tocar', () => acao('tocar', item.id)), button('❌ Remover', () => acao('remover', item.id)));
+      const tocar = button(item.status === 'tocando' ? '🎧 Tocando' : '▶️ Tocar', () => acao('tocar', item.id));
+      tocar.disabled = item.status === 'tocando';
+      actions.append(tocar, button('❌ Remover', () => acao('remover', item.id)));
       row.append(actions);
     }
     box.append(row);
@@ -137,92 +158,14 @@ function render() {
       row.append(text, button('Remover sugestão', () => acao('remover-sugestao', item.id)));
       el('sugestoes').append(row);
     }
-  } else {
-    const t = estado.transmissao;
-    el('agora').textContent = t ? `🎵 ${t.musica} — pedido por ${t.nome}` : 'Nenhuma música tocando no momento.';
-    sincronizar();
   }
 }
 
-function posicao() { return Math.max(0, (performance.now() + relogio - estado.transmissao.inicio) / 1000); }
-
-function sincronizar() {
-  const t = estado.transmissao;
-  if (!t) {
-    if (sessaoAudio !== null) {
-      audio.pause(); audio.removeAttribute('src'); audio.load();
-    }
-    audio.playbackRate = 1;
-    sessaoAudio = null; bloqueado = false;
-    el('audioStatus').textContent = 'Aguardando a programação.';
-    el('ativarSom').hidden = true;
-    return;
-  }
-  if (sessaoAudio !== t.sessao) {
-    sessaoAudio = t.sessao; bloqueado = false;
-    alinhamentoInicial = true;
-    ultimoSalto = -Infinity;
-    audio.playbackRate = 1;
-    audio.src = '/musicas/' + encodeURIComponent(t.arquivo);
-    audio.load();
-  }
-  if (audio.readyState < 2 || audio.seeking || relogio === null) return;
-  const target = posicao();
-  if (Number.isFinite(audio.duration) && target >= audio.duration) {
-    audio.pause();
-    audio.playbackRate = 1;
-    el('audioStatus').textContent = 'Música encerrada. Aguardando a próxima transmissão.';
-    el('ativarSom').hidden = true;
-    return;
-  }
-  const desvio = target - audio.currentTime;
-  const agora = performance.now();
-  if (alinhamentoInicial || (Math.abs(desvio) > 1.5 && agora - ultimoSalto > 5000)) {
-    audio.currentTime = target;
-    alinhamentoInicial = false;
-    ultimoSalto = agora;
-    audio.playbackRate = 1;
-  } else if (!audio.paused && Math.abs(desvio) > 0.15 && Math.abs(desvio) <= 1.5) {
-    // Pequenas diferenças são corrigidas gradualmente, sem saltos na música.
-    audio.playbackRate = desvio > 0 ? 1.03 : 0.97;
-  } else {
-    audio.playbackRate = 1;
-  }
-  if (audio.paused && !bloqueado) tentarPlay();
-}
-
-async function tentarPlay() {
-  const session = sessaoAudio;
-  if (playPendente === session) return;
-  playPendente = session;
-  try {
-    await audio.play();
-    if (session !== sessaoAudio) return;
-    bloqueado = false; el('ativarSom').hidden = true;
-    el('audioStatus').textContent = '🔴 Ouvindo a transmissão ao vivo.';
-  } catch (error) {
-    if (session !== sessaoAudio || error.name === 'AbortError') return;
-    bloqueado = true; el('ativarSom').hidden = false;
-    el('audioStatus').textContent = error.name === 'NotAllowedError'
-      ? 'Seu navegador pede uma interação: toque em Ativar som para ouvir a rádio.'
-      : 'Não foi possível reproduzir o áudio. Toque em Ativar som para tentar novamente.';
-  } finally { if (playPendente === session) playPendente = null; }
-}
-function ativarSom() {
-  if (!estado.transmissao) return;
-  if (audio.readyState >= 1) audio.currentTime = Math.min(posicao(), audio.duration || Infinity);
-  bloqueado = false;
-  tentarPlay();
-}
+function ativarSom() { player?.enable(); }
 
 if (audio) {
   el('musica').append(new Option('Selecione uma música', ''));
   MUSICAS.forEach(m => el('musica').append(new Option(m.nome, m.arquivo)));
-  audio.addEventListener('loadedmetadata', sincronizar);
-  audio.addEventListener('canplay', sincronizar);
-  audio.addEventListener('seeked', sincronizar);
-  if ('preservesPitch' in audio) audio.preservesPitch = true;
-  audio.addEventListener('error', () => { el('audioStatus').textContent = 'Arquivo de áudio indisponível. Avise a gestão.'; });
   el('volume').oninput = () => { audio.volume = Number(el('volume').value); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizar(); });
 }

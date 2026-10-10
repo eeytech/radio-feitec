@@ -124,6 +124,9 @@ class Handler(SimpleHTTPRequestHandler):
                         item = next((x for x in STATE['pedidos'] if x['id'] == data.get('id')), None)
                         if not item:
                             raise ValueError('Pedido não encontrado.')
+                        if STATE['transmissao'] and STATE['transmissao']['id'] == item['id']:
+                            self.reply({'ok': True})
+                            return
                         for x in STATE['pedidos']:
                             x['status'] = 'tocando' if x is item else 'pendente'
                         STATE['transmissao'] = {**item, 'inicio': time.time() * 1000, 'sessao': secrets.token_hex(12)}
@@ -140,6 +143,7 @@ class Handler(SimpleHTTPRequestHandler):
                     else:
                         self.reply({'erro': 'Rota não encontrada.'}, 404)
                         return
+                STATE['revisao'] = STATE.get('revisao', 0) + 1
                 DB.execute('INSERT OR REPLACE INTO estado VALUES (1, ?)', (json.dumps(STATE),))
                 DB.commit()
                 self.reply({'ok': True})

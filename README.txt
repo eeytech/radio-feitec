@@ -14,11 +14,16 @@ em /musicas/catalogo.js, mantendo o formato existente. Recarregue a página.
 
 TRANSMISSÃO: Tocar inicia diretamente a música do pedido para todos.
 O horário central de início sincroniza quem já está ouvindo e quem entra depois.
-Atualização a cada segundo; o relógio usa as amostras de menor latência.
-Desvios entre 0,15 e 1,5 segundo são corrigidos gradualmente pela velocidade.
-Desvios maiores usam busca, com intervalo mínimo de 5 segundos entre saltos.
-O áudio espera carregar antes do primeiro alinhamento; respostas antigas
-são descartadas. Alternância de instâncias temporárias gera um aviso.
+Atualização da fila a cada segundo, sem recarregar o player.
+O arquivo de áudio só muda quando a sessão da transmissão muda.
+Ajustes de tempo ocorrem separadamente, a cada 2 segundos; durante buffer ou
+busca, não há correções. Pequenos desvios usam ajustes de velocidade de 2%.
+Atrasos acima de 3 segundos só causam busca se persistirem por três medições,
+com buffer estável e ao menos 15 segundos desde a busca anterior.
+Respostas antigas são ignoradas. Se a instância temporária da Vercel mudar,
+a reprodução atual é preservada e a página pede reconexão, em vez de alternar
+entre programações conflitantes. Isso evita interrupções, mas não cria um
+armazenamento compartilhado entre instâncias.
 A sincronização é aproximada e depende da rede e do navegador.
 Parar, remover o pedido tocando ou limpar a fila interrompe a transmissão.
 Ao terminar uma faixa, a rádio aguarda o próximo Tocar.
@@ -55,3 +60,16 @@ para CREATE TABLE. Use a conexão com pooling fornecida pelo banco, se disponív
 Não envie credenciais por chat e não inclua arquivos .env no repositório.
 O SQLite local não é usado na Vercel e não é migrado automaticamente.
 O teste local com python server.py continua disponível, com banco separado.
+
+TESTES DE REGRESSÃO
+npm install
+npm test
+npm run check
+npm run build
+O teste de navegador está em tests/browser.cjs e usa Chrome instalado e
+playwright-core. Para executá-lo: npm install --no-save playwright-core
+Depois: npm run test:browser
+BROWSER_EXECUTABLE pode indicar outro executável Chromium/Edge.
+O teste inicia sua própria API local, usa dois ouvintes e três faixas, envia
+pedidos durante a reprodução e injeta respostas antigas e de outra instância.
+Não modifica o deploy publicado nem o banco local Python.
